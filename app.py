@@ -11,5 +11,5 @@ def index():
 
 
 if __name__ == "__main__":
-    PORT = os.getenv("PORT", 3000)
-    app.run(threaded=True, port=PORT)
+    port = int(os.environ.get("PORT", 3000))
+    app.run(threaded=True, port=port)
