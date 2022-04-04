@@ -132,3 +132,6 @@ dmypy.json
 # Custom
 pyvenv.cfg
 bin/
+connect-db.sh
+*.json
+*.sql
