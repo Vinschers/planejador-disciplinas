@@ -1,8 +1,10 @@
 import os
+import psycopg2
 from flask import Flask, render_template
 
 
 app = Flask(__name__)
+conn = psycopg2.connect(os.environ.get("DATABASE_URL"), sslmode="require")
 
 
 @app.route("/")
