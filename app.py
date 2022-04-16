@@ -1,8 +1,6 @@
 import os
-from dotenv import load_dotenv
-from flask import Flask, render_template
+from flask import Flask
 
-load_dotenv()
 
 from views import index_profile, db_profile, cursor, conn
 
