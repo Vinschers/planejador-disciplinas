@@ -1,7 +1,236 @@
-body {
-    height: 100vh;
+@import "https://unpkg.com/open-props";
+/* @import "https://unpkg.com/open-props/normalize.min.css"; */
+
+
+:root {
+    --azul: #0d6efd;
+    --azul-hover: #0b5ed7;
+
+    --verde: #198754;
+    --verde-hover: #157147;
+
+    --verde_claro: #20c997;
+    --verde_claro-hover: #1cb386;
+
+    --vermelho: #dc3545;
+    --vermelho-hover: #d32535;
+
+    --roxo: #6f42c1;
+    --roxo-hover: #643ab0;
+
+    --ciano: #0dcaf0;
+    --ciano-hover: #0cb6d8;
+
+    --amarelo: #ffc107;
+    --amarelo-hover: #edb100;
 }
 
-.container {
-    height: 100%;
+body {
+    position: relative;
+    background-color: var(--gray-9);
+}
+
+#ligarOpcoes {
+    position: absolute;
+    top: 1vh;
+    left: 1vw;
+}
+
+.conteudo {
+    display: flex;
+    flex-direction: row;
+}
+
+#opcoes {
+    background-color: var(--gray-1);
+    color: var(--gray-9);
+    height: 100vh;
+    width: 23vw;
+    overflow-y: scroll;
+    padding: 6vh 1vw 0 1vw;
+}
+
+.seletorWrapper {
+    margin-top: 2vh;
+    margin-bottom: 5vh;
+}
+.seletorDisciplinas {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid black;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+.seletorDisciplinas > .itens {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    height: 18vh;
+    overflow: auto;
+}
+
+.seletorDisciplinas > .pesquisa {
+    width: 100%;
+    position: relative;
+    display: table;
+    background-color: var(--gray-3);
+    color: var(--gray-9);
+    border-radius: 4px;
+}
+.seletorDisciplinas > .pesquisa > input {
+    border: none;
+
+    padding: 5px;
+    padding-left: 1.3em;
+    padding-right: 1.3em;
+    margin-left: 0.7em;
+
+    font-size: 1.25em;
+    outline: none;
+
+    /* background: url("/static/img/search_icon.png") no-repeat left; */
+    background: url("https://static.thenounproject.com/png/101791-200.png") no-repeat left;
+    background-size: 1em;
+    background-color: inherit;
+    color: inherit;
+}
+
+.seletorDisciplinas > .itens > button {
+    margin-left: 15px;
+    margin-top: 10px;
+    max-width: 5vw;
+}
+
+#grafo {
+    margin-top: 4vh;
+    padding: 1vw;
+    overflow: hidden;
+}
+
+.linha {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+
+    padding: 2vh;
+}
+.linha:not(:last-child) {
+    margin-bottom: 2vh;
+}
+
+.disciplina {
+    --tamanho: 6;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+
+    min-width: calc(var(--tamanho) * 3rem);
+    max-width: calc(var(--tamanho) * 3rem);
+    min-height: calc(var(--tamanho) * 1rem);
+    max-height: calc(var(--tamanho) * 1rem);
+
+    padding-left: 1em;
+    padding-right: 1em;
+
+    border-radius: 4px;
+    box-shadow: var(--shadow-3);
+
+    text-decoration: none;
+    font-size: calc(var(--tamanho) * 0.15rem);
+    background-color: var(--gray-8);
+    color: var(--gray-0);
+
+    transition: background-color 0.4s;
+    transition: transform 0.4s;
+}
+.disciplina:not(:first-child) {
+    margin-left: 2em;
+}
+.disciplina:hover {
+    cursor: pointer;
+    transform: scale(1.01);
+    color: var(--gray-0);
+}
+.disciplina > .nome {
+    text-align: center;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-weight: 600;
+}
+
+.disciplina > .grande {
+    font-size: calc(var(--tamanho) * 0.2rem);
+}
+
+.disciplina > .codigo {
+    position: absolute;
+    top: calc(var(--tamanho) / 15 * 1em);
+    left: calc(var(--tamanho) / 10 * 1em);
+}
+
+.disciplina > .creditos {
+    position: absolute;
+    bottom: calc(var(--tamanho) / 15 * 1em);
+    right: calc(var(--tamanho) / 10 * 1em);
+}
+
+.desativado {
+    background-color: var(--gray-7) !important;
+    color: var(--gray-6) !important;
+}
+
+
+.ma {
+    background-color: var(--azul);
+}
+.ma:hover {
+    background-color: var(--azul-hover);
+}
+
+.f {
+    background-color: var(--vermelho);
+}
+.f:hover {
+    background-color: var(--vermelho-hover);
+}
+
+.mc {
+    background-color: var(--roxo);
+}
+.mc:hover {
+    background-color: var(--roxo-hover);
+}
+
+.ms {
+    background-color: var(--ciano);
+    color: var(--gray-9);
+}
+.ms:hover {
+    background-color: var(--ciano-hover);
+    color: var(--gray-9);
+}
+
+.me {
+    background-color: var(--amarelo);
+    color: var(--gray-9);
+}
+.me {
+    background-color: var(--amarelo-hover);
+    color: var(--gray-9);
+}
+
+.ce {
+    background-color: var(--verde_claro);
+    color: var(--gray-9);
+}
+.ce:hover {
+    background-color: var(--verde_claro-hover);
+    color: var(--gray-9);
 }
