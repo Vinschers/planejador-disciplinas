@@ -4,7 +4,7 @@ function desmembrarPreRequisitos(pre_requisitos) {
     pre_requisitos.forEach(pre_req => {
         const pre_req_split = pre_req.split(" ");
         const possibilidade = parseInt(pre_req_split[0]);
-        const pre_req_id = pre_req_split[1];
+        const pre_req_id = parseInt(pre_req_split[1]);
 
         if (desmembrados.length < possibilidade + 1)
             desmembrados.push([pre_req_id]);
@@ -15,56 +15,79 @@ function desmembrarPreRequisitos(pre_requisitos) {
     return desmembrados;
 }
 
-function calcularValorPossibilidadePreRequisito(disciplinas, pre_reqs) {
-    let possivel = true;
+function calcularDistanciaPreRequisito(disciplinas, aparentes, lista) {
+    let distancia = 0;
 
-    for (let i = 0; i < pre_reqs.length; ++i) {
-        if (!(pre_reqs[i] in disciplinas)) {
-            possivel = false;
-            break;
+    lista.forEach(id => {
+        if (aparentes.includes(id))
+            ++distancia;
+        else if (!disciplinas[id]["feita"]) {
+            let menorDistancia = 1 << 31;
+
+            if (disciplinas[id]["pre_requisitos"].length > 0 && !Array.isArray(disciplinas[id]["pre_requisitos"]))
+                distancia += calcularDistanciaPreRequisito(disciplinas, aparentes, disciplinas[id]["pre_requisitos"])
+            else if (disciplinas[id]["pre_requisitos"].length > 0) {
+                disciplinas[id]["pre_requisitos"].forEach(pre_reqs => {
+                    const distanciaAtual = calcularDistanciaPreRequisito(disciplinas, aparentes, pre_reqs);
+
+                    if (distanciaAtual < menorDistancia)
+                        menorDistancia = distanciaAtual;
+                });
+
+                if (menorDistancia < 1 << 31)
+                    distancia += menorDistancia;
+            }
         }
-    }
+    });
 
-    if (!possivel)
-        return -1;
-
-    let feitos = 0;
-    let obrigatorias = 0;
-
-    for (let i = 0; i < lista_pre_requisitos.length; ++i) {
-        if (disciplinas[lista_pre_requisitos[i]]["feita"])
-            ++feitos;
-
-        if (aparentes.includes(disciplinas[lista_pre_requisitos[i]]["id"]))
-            ++obrigatorias;
-    }
+    return distancia;
 }
 
-function consertarPreRequisitos(disciplinas, aparentes) {
-    aparentes.forEach(id => {
-        const disciplina = disciplinas[id];
+function consertarPreRequisitos(disciplinas, aparentes, ids) {
+    let terminou = false;
+    const novas_aparentes = [];
 
-        disciplina["pre_requisitos"] = desmembrarPreRequisitos(disciplina["pre_requisitos"]);
+    while (!terminou) {
+        terminou = true;
 
-        if (disciplina["pre_requisitos"].length == 1) {
-            disciplina["pre_requisitos"] = disciplina["pre_requisitos"][0];
-            return;
-        }
+        ids.forEach(id => {
+            const disciplina = disciplinas[id];
+            const listas = disciplina["pre_requisitos"];
 
-        let pre_requisitos = [];
-        let maiorValor = -1;
+            if (listas.length > 0 && Array.isArray(listas[0])) {
+                terminou = false;
 
-        disciplina["pre_requisitos"].forEach(lista_pre_requisitos => {
-            const valorPossibilidade = calcularValorPossibilidadePreRequisito(disciplinas, lista_pre_requisitos);
+                if (listas.length == 1) {
+                    disciplina["pre_requisitos"] = listas[0];
+                    return;
+                }
 
-            if (valorPossibilidade > maiorValor) {
-                pre_requisitos = lista_pre_requisitos;
-                maiorValor = valorPossibilidade;
+                for (let i = 0; i < listas.length; ++i) {
+                    const lista = listas[i];
+                    let estaoAparentes = true;
+
+                    for (let j = 0; j < lista.length && estaoAparentes; ++j) {
+                        const pre_req = lista[j];
+
+                        if (!aparentes.includes(pre_req))
+                            estaoAparentes = false;
+                    }
+
+                    if (estaoAparentes) {
+                        disciplina["pre_requisitos"] = lista;
+                        return;
+                    }
+                }
             }
-        });
 
-        disciplina["pre_requisitos"] = pre_requisitos;
-    });
+            listas.forEach(pre_req => {
+                if (!aparentes.includes(pre_req))
+                    novas_aparentes.push(pre_req);
+            });
+        });
+    }
+
+    return novas_aparentes;
 }
 
 function inverterGrafo(disciplinasObj) {
@@ -192,19 +215,20 @@ function ativarElementos(elementos) {
     });
 }
 
-function ativarElemento(elementos, id, mostrarPreReqs) {
+function ativarElemento(elementos, id, mostrarPreReqs, mostrarConsequencias) {
     elementos[id].classList.remove("desativado");
 
-    elementos[id]["disciplina"]["consequencias"].forEach(con => {
-        ativarElemento(elementos, con, false);
-    });
+    if (mostrarConsequencias) {
+        elementos[id]["disciplina"]["consequencias"].forEach(con => {
+            ativarElemento(elementos, con, false, true);
+        });
+    }
 
-    if (!mostrarPreReqs)
-        return;
-
-    elementos[id]["disciplina"]["pre_requisitos"].forEach(pre_req => {
-        ativarElemento(elementos, pre_req, true);
-    })
+    if (mostrarPreReqs) {
+        elementos[id]["disciplina"]["pre_requisitos"].forEach(pre_req => {
+            ativarElemento(elementos, pre_req, true, false);
+        })
+    }
 }
 
 function criarElementosDisciplinas(grafo) {
@@ -217,7 +241,7 @@ function criarElementosDisciplinas(grafo) {
         elemento.onmouseenter = function(e) {
             if ("disciplina" in e.target) {
                 desativarElementos(elementos);
-                ativarElemento(elementos, e.target["disciplina"]["id"], true);
+                ativarElemento(elementos, e.target["disciplina"]["id"], true, true);
             }
         }
 
@@ -232,43 +256,55 @@ function criarElementosDisciplinas(grafo) {
     return elementos;
 }
 
-function atualizarGrafo() {
+function atualizarDisciplinas(ids) {
     const divGrafo = document.getElementById("grafo");
 
     const todasDisciplinas = divGrafo["todasDisciplinas"];
     const disciplinasAparentes = divGrafo["disciplinasAparentes"];
-    const elementos = divGrafo["elementos"];
 
-    consertarPreRequisitos(todasDisciplinas, disciplinasAparentes);
-    const aparentes = {};
-
-    disciplinasAparentes.forEach(id => {
-        const disciplina = todasDisciplinas[id];
-        aparentes[id] = disciplina;
-
-        disciplina["pre_requisitos"].forEach(pre_req => {
-            aparentes[pre_req] = todasDisciplinas[pre_req];
-        });
+    ids.forEach(id => {
+        if (disciplinasAparentes.includes(id))
+            disciplinasAparentes.splice(disciplinasAparentes.indexOf(id), 1);
+        else
+            disciplinasAparentes.push(id);
     });
 
-    console.log(aparentes)
+    const todasDisciplinasConsertadas = new Object(todasDisciplinas);
+    const novas_aparentes = consertarPreRequisitos(todasDisciplinasConsertadas, disciplinasAparentes, disciplinasAparentes);
+    const aparentes = {};
+
+    disciplinasAparentes.forEach(id => aparentes[id] = todasDisciplinasConsertadas[id]);
+    novas_aparentes.forEach(id => aparentes[id] = todasDisciplinasConsertadas[id]);
 
     const grafoConsequencias = inverterGrafo(aparentes);
+    divGrafo["disciplinasAparentes"] = [];
 
     Object.keys(aparentes).forEach(id => {
         if (id in grafoConsequencias)
             aparentes[id]["consequencias"] = grafoConsequencias[id];
         else
             aparentes[id]["consequencias"] = [];
+
+        divGrafo["disciplinasAparentes"].push(parseInt(id));
     });
 
-    divGrafo["disciplinasAparentes"] = Object.keys(aparentes);
+    return aparentes;
+}
+
+function atualizarGrafo(ids, embaralhar) {
+    const divGrafo = document.getElementById("grafo");
+    const elementos = divGrafo["elementos"];
+
+    const aparentes = atualizarDisciplinas(ids);
+
     divGrafo.innerHTML = "";
 
     const ordenado = ordenacaoTopologica(aparentes);
 
-    for (let i = 0; i < ordenado.length; ++i)
-        ordenado[i].sort(() => Math.random() - 0.5);
+    if (embaralhar) {
+        for (let i = 0; i < ordenado.length; ++i)
+            ordenado[i].sort(() => Math.random() - 0.5);
+    }
 
     ordenado.forEach(linha => {
         const divLinha = criarDivLinhaDisciplinas();
@@ -346,7 +382,7 @@ function criarSeletor(nome, disciplinas, classeOutline, click) {
 
     wrapper.append(titulo);
     wrapper.append(seletor);
-    
+
     return wrapper;
 }
 
@@ -377,7 +413,7 @@ function criarSeletorFeitas(feitas) {
                 $(botao.parentElement).append(botao);
         }
 
-        // atualizarGrafo();
+        atualizarGrafo();
     });
 }
 
@@ -392,8 +428,6 @@ function criarSeletorEletivas(nome, disciplinas) {
         const disciplina = botao["disciplina"];
 
         if (aparentes.includes(disciplina["id"])) {
-            delete grafo[disciplina["id"]];
-
             botao.classList.remove(classeSelecionado);
             botao.classList.add(classeOutline);
 
@@ -402,8 +436,6 @@ function criarSeletorEletivas(nome, disciplinas) {
             else
                 $(botao.parentElement).append(botao);
         } else {
-            grafo[disciplina["id"]] = disciplina;
-
             botao.classList.remove(classeOutline);
             botao.classList.add(classeSelecionado);
             botao["proximo"] = botao.nextElementSibling;
@@ -411,7 +443,67 @@ function criarSeletorEletivas(nome, disciplinas) {
             $(botao.parentElement).prepend(botao);
         }
 
-        atualizarGrafo();
+        atualizarGrafo([disciplina["id"]], false);
+    });
+}
+
+/* https://stackoverflow.com/a/48601418 */
+function ordenarComNumeraisRomanos(data, order) {
+
+    function isNumber(v) {
+        return (+v).toString() === v;
+    }
+
+    function isRoman(s) {
+        // http://stackoverflow.com/a/267405/1447675
+        return /^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/i.test(s);
+    }
+
+    function parseRoman(s) {
+        var val = { M: 1000, D: 500, C: 100, L: 50, X: 10, V: 5, I: 1 };
+        return s.toUpperCase().split('').reduce(function(r, a, i, aa) {
+            return val[a] < val[aa[i + 1]] ? r - val[a] : r + val[a];
+        }, 0);
+    }
+
+    var sort = {
+        asc: function(a, b) {
+            var i = 0,
+                l = Math.min(a.value.length, b.value.length);
+
+            while (i < l && a.value[i] === b.value[i]) {
+                i++;
+            }
+            if (i === l) {
+                return a.value.length - b.value.length;
+            }
+            if (isNumber(a.value[i]) && isNumber(b.value[i])) {
+                return a.value[i] - b.value[i];
+            }
+            if (isRoman(a.value[i]) && isRoman(b.value[i])) {
+                return parseRoman(a.value[i]) - parseRoman(b.value[i]);
+            }
+            return a.value[i].localeCompare(b.value[i]);
+        },
+        desc: function(a, b) {
+            return sort.asc(b, a);
+        }
+    },
+        mapped = data.map(function(el, i) {
+            var string = el.replace(/\d(?=[a-z])|[a-z](?=\.)/gi, '$&. .'),
+                regex = /(\d+)|([^0-9.]+)/g,
+                m,
+                parts = [];
+
+            while ((m = regex.exec(string)) !== null) {
+                parts.push(m[0]);
+            }
+            return { index: i, value: parts, o: el, string: string };
+        });
+
+    mapped.sort(sort[order] || sort.asc);
+    return mapped.map(function(el) {
+        return data[el.index];
     });
 }
 
@@ -431,6 +523,9 @@ function configurarSeletores(disciplinas) {
     Object.keys(disciplinas).forEach(id => {
         const disciplina = disciplinas[id];
 
+        if (disciplina["tipo_grupo"] == 0)
+            return;
+
         if (disciplina["nome_grupo"] in tiposDisciplinas)
             tiposDisciplinas[disciplina["nome_grupo"]].push(disciplina);
         else
@@ -442,7 +537,7 @@ function configurarSeletores(disciplinas) {
 
     seletores.append(feitas);
 
-    Object.keys(tiposDisciplinas).forEach(tipo => {
+    ordenarComNumeraisRomanos(Object.keys(tiposDisciplinas)).forEach(tipo => {
         const seletor = criarSeletorEletivas(tipo, tiposDisciplinas[tipo]);
         seletores.append(seletor);
     })
@@ -485,18 +580,21 @@ $(document).ready(function() {
             const todasDisciplinas = {};
             JSON.parse(responseTodas).forEach(disciplina => {
                 disciplina["feita"] = false;
+                disciplina["pre_requisitos"] = desmembrarPreRequisitos(disciplina["pre_requisitos"]);
+
                 todasDisciplinas[disciplina["id"]] = disciplina;
             });
 
             const divGrafo = document.getElementById("grafo");
-
             const elementos = criarElementosDisciplinas(todasDisciplinas);
 
             divGrafo["todasDisciplinas"] = todasDisciplinas;
-            divGrafo["disciplinasAparentes"] = getDisciplinasAparentes(disciplinasCurso);
+            divGrafo["disciplinasAparentes"] = [];
             divGrafo["elementos"] = elementos;
 
-            atualizarGrafo();
+            const aparentes = getDisciplinasAparentes(disciplinasCurso);
+
+            atualizarGrafo(aparentes, true);
             configurarSeletores(disciplinasCurso);
         });
     });
