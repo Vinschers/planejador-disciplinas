@@ -102,6 +102,24 @@ body {
     max-width: 5vw;
 }
 
+.seletor-desativado {
+    color: var(--gray-6);
+    border-color: var(--gray-6);
+    background-color: white;
+    box-shadow: none;
+}
+.seletor-desativado:hover, .seletor-desativado:focus, .seletor-desativado:focus-within, .seletor-desativado:focus-visible, .seletor-desativado:active {
+    outline: none;
+    box-shadow: none;
+    cursor: default;
+    color: var(--gray-6);
+    border-color: var(--gray-6);
+    background-color: white;
+}
+.btn-outline-primary:focus {
+    box-shadow: none !important;
+}
+
 #grafo {
     margin-top: 4vh;
     padding: 1vw;
