@@ -38,7 +38,7 @@ def getCursos():
     return json.dumps(cursos, ensure_ascii=False)
 
 
-@db_profile.route("/getDisciplinas")
+@db_profile.route("/getDisciplinasCurso")
 def getDisciplinas():
     codigoUniversidade = request.args.get("uni", 0)
     codigoCurso = request.args.get("curso", 0)
@@ -47,7 +47,7 @@ def getDisciplinas():
         return '[]'
 
     cursor.execute(
-        f"SELECT d.*, cd.tipo AS tipo_grupo, cd.nome AS nome_grupo, cd.creditos AS creditos_grupo, ARRAY(SELECT CONCAT(pr.possibilidade, ' ', pr.pre_requisito_id) FROM pre_requisito pr WHERE pr.disciplina_id = d.id) AS pre_requisitos FROM disciplina d INNER JOIN curso c on d.universidade_id = c.universidade_id INNER JOIN curso_disciplinas cd on cd.curso_id = c.id WHERE c.codigo = '{codigoCurso}' AND c.universidade_id = {codigoUniversidade} AND d.codigo LIKE cd.sql_like AND CASE WHEN ARRAY_LENGTH(cd.sql_in, 1) > 0 THEN d.codigo = ANY(cd.sql_in) ELSE TRUE END;"
+        f"SELECT d.id, cd.tipo AS tipo_grupo, cd.nome AS nome_grupo, cd.creditos AS creditos_grupo, ARRAY(SELECT CONCAT(pr.possibilidade, ' ', pr.pre_requisito_id) FROM pre_requisito pr WHERE pr.disciplina_id = d.id) AS pre_requisitos FROM disciplina d INNER JOIN curso c on d.universidade_id = c.universidade_id INNER JOIN curso_disciplinas cd on cd.curso_id = c.id WHERE c.codigo = '{codigoCurso}' AND c.universidade_id = {codigoUniversidade} AND d.codigo LIKE cd.sql_like AND CASE WHEN ARRAY_LENGTH(cd.sql_in, 1) > 0 THEN d.codigo = ANY(cd.sql_in) ELSE TRUE END;"
     )
 
     disciplinas = cursor.fetchall()
