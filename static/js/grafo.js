@@ -82,7 +82,7 @@ function consertarPreRequisitos(disciplina) {
     let pre_reqs_novos = possibilidades_pre_reqs_novos[0];
 
     for (let i = 0; i < possibilidades_pre_reqs_novos.length; ++i) {
-        if(possibilidades_pre_reqs_novos[i].length < possibilidades_pre_reqs_novos[disciplina["lista_pre_requisitos"]]) {
+        if (possibilidades_pre_reqs_novos[i].length < possibilidades_pre_reqs_novos[disciplina["lista_pre_requisitos"]]) {
             disciplina["lista_pre_requisitos"] = i;
             pre_reqs_novos = possibilidades_pre_reqs_novos[i];
         }
@@ -91,7 +91,7 @@ function consertarPreRequisitos(disciplina) {
     return pre_reqs_novos;
 }
 
-function consertarGrupos(gruposDict, id) {
+function consertarGrupo(gruposDict, id) {
     const disciplina = hashDisciplinas[id];
 
     let nome_grupo = disciplina["nome_grupo"][0];
@@ -116,6 +116,46 @@ function consertarGrupos(gruposDict, id) {
     disciplina["nome_grupo"] = nome_grupo;
     disciplina["tipo_grupo"] = tipo_grupo;
     disciplina["creditos_grupo"] = creditos_grupo;
+}
+
+function consertarGrupos(disciplinasCurso) {
+    const gruposDict = {};
+
+    disciplinasCurso.forEach(disciplina => {
+
+        const id = disciplina["id"];
+        const nome_grupo = disciplina["nome_grupo"];
+        const tipo_grupo = disciplina["tipo_grupo"];
+        const creditos_grupo = disciplina["creditos_grupo"];
+
+        if (nome_grupo in gruposDict)
+            ++gruposDict[nome_grupo];
+        else
+            gruposDict[nome_grupo] = 1;
+
+        disciplina = { ...disciplina, ...hashDisciplinas[id] };
+
+        if (Array.isArray(disciplina["nome_grupo"]))
+            disciplina["nome_grupo"].push(nome_grupo);
+        else
+            disciplina["nome_grupo"] = [nome_grupo];
+
+        if (Array.isArray(disciplina["tipo_grupo"]))
+            disciplina["tipo_grupo"].push(tipo_grupo);
+        else
+            disciplina["tipo_grupo"] = [tipo_grupo];
+
+        if (Array.isArray(disciplina["creditos_grupo"]))
+            disciplina["creditos_grupo"].push(creditos_grupo);
+        else
+            disciplina["creditos_grupo"] = [creditos_grupo];
+
+        hashDisciplinas[id] = disciplina;
+    });
+
+    Object.keys(hashDisciplinas).forEach(id => {
+        consertarGrupo(gruposDict, id);
+    });
 }
 
 function inverterGrafo(disciplinasObj) {
@@ -223,7 +263,7 @@ function criarElementoDisciplina(disciplina) {
     elemento.classList.add(getClasseDisciplina(disciplina["codigo"]));
     elemento.innerHTML += `<span class="codigo">${disciplina["codigo"]}</span>`;
 
-    if (disciplina["nome"].length > 30)
+    if (disciplina["nome"].length > 27)
         elemento.innerHTML += `<span class="nome">${disciplina["nome"]}</span>`;
     else
         elemento.innerHTML += `<span class="nome grande">${disciplina["nome"]}</span>`;
@@ -295,6 +335,46 @@ function criarHashGrafoDisciplinas() {
     return hash;
 }
 
+function getConsequenciasTotais(disciplina) {
+    let qtdConsequencias = disciplina["consequencias"].length;
+
+    disciplina["consequencias"].forEach(consequencia => {
+        qtdConsequencias += getConsequenciasTotais(hashDisciplinas[consequencia]);
+    });
+
+    return qtdConsequencias;
+}
+
+function atualizarElementosDisciplinas() {
+    if ($.isEmptyObject(elementosDisciplinas)) {
+        criarElementosDisciplinas();
+    }
+
+    grafoDisciplinas.forEach(id => {
+        const disciplina = hashDisciplinas[id];
+
+        if (disciplina["feita"])
+            elementosDisciplinas[id].classList.add("feita");
+        else
+            elementosDisciplinas[id].classList.remove("feita");
+    });
+
+    grafoDisciplinas.forEach(id => {
+        const disciplina = hashDisciplinas[id];
+
+        let possivel = true;
+        getPreRequisitos(disciplina).forEach(pre_req => {
+            if (!hashDisciplinas[pre_req]["feita"])
+                possivel = false;
+        });
+
+        if (possivel && !disciplina["feita"])
+            elementosDisciplinas[id].classList.add("possivel");
+        else
+            elementosDisciplinas[id].classList.remove("possivel");
+    });
+}
+
 function atualizarGrafo() {
     const divGrafo = document.getElementById("grafo");
     divGrafo.innerHTML = "";
@@ -311,8 +391,23 @@ function atualizarGrafo() {
 
     const ordenado = ordenacaoTopologica(hashGrafoDisciplinas);
 
-    for (let i = 0; i < ordenado.length; ++i)
-        ordenado[i].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < ordenado.length; ++i) {
+        ordenado[i].sort((idA, idB) => {
+            const disciplinaA = hashDisciplinas[idA];
+            const disciplinaB = hashDisciplinas[idB];
+
+            const diffFeita = disciplinaA["feita"] - disciplinaB["feita"];
+
+            if (diffFeita != 0)
+                return diffFeita;
+
+            const qtdConA = getConsequenciasTotais(disciplinaA);
+            const qtdConB = getConsequenciasTotais(disciplinaB);
+            return qtdConB - qtdConA;
+        });
+    }
+
+    atualizarElementosDisciplinas();
 
     ordenado.forEach(linha => {
         const divLinha = criarDivLinhaDisciplinas();
@@ -322,11 +417,14 @@ function atualizarGrafo() {
         div = divLinha;
         divGrafo.append(divLinha)
     });
+
+    // deleteCookie("info");
+    setCookie("info", JSON.stringify(cookieInfo));
 }
 
 function pesquisarSeletor(evento) {
     const input = evento.target;
-    const pesquisa = input.value;
+    const pesquisa = input.value.toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 
     const divPesquisa = input.parentElement;
     const seletor = divPesquisa.parentElement;
@@ -334,8 +432,13 @@ function pesquisarSeletor(evento) {
 
     for (let i = 0; i < itens.children.length; ++i) {
         const btnDisciplina = itens.children[i];
+        const disciplina = btnDisciplina["disciplina"];
 
-        if (!btnDisciplina.innerText.toUpperCase().includes(pesquisa.toUpperCase())) {
+        const codigo = disciplina["codigo"].toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+        const nome = disciplina["nome"].toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+        const descricao = disciplina["descricao"].toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
+        if (!(codigo.includes(pesquisa) || nome.includes(pesquisa) || descricao.includes(pesquisa))) {
             btnDisciplina.style.display = "none";
         } else {
             btnDisciplina.style.display = "inline-block";
@@ -358,6 +461,57 @@ function criarCaixaDePesquisa() {
     return divPesquisa;
 }
 
+function criarConteudoPopover(disciplina) {
+    const wrapper = document.createElement("div");
+    const nome = document.createElement("h5");
+    const creditos = document.createElement("h6");
+    const pre_requisitos = document.createElement("h6");
+    const descricao = document.createElement("span");
+
+    consertarPreRequisitos(disciplina);
+    const codigos_pre_requisitos = [];
+
+    disciplina["pre_requisitos"][disciplina["lista_pre_requisitos"]].forEach(id => {
+        codigos_pre_requisitos.push(hashDisciplinas[id]["codigo"]);
+    });
+
+    nome.innerText = disciplina["nome"];
+    creditos.innerText = disciplina["creditos"] + " créditos";
+    pre_requisitos.innerText = "Pré-requisitos: " + codigos_pre_requisitos.join(", ");
+    descricao.innerText = disciplina["descricao"];
+
+    wrapper.appendChild(nome);
+    wrapper.appendChild(creditos);
+
+    if (codigos_pre_requisitos.length > 0)
+        wrapper.appendChild(pre_requisitos);
+
+    wrapper.appendChild(descricao);
+
+    return wrapper;
+}
+
+function criarItemSeletor(disciplina, classeOutline, click) {
+    const botao = document.createElement("button");
+
+    botao.innerText = disciplina["codigo"];
+    botao.classList.add("btn");
+    botao.classList.add(classeOutline);
+    botao.onclick = click;
+
+    botao.setAttribute("data-bs-toggle", "popover");
+    botao.setAttribute("data-bs-trigger", "hover");
+    botao.setAttribute("data-bs-html", "true");
+
+    botao.setAttribute("title", disciplina["codigo"]);
+    botao.setAttribute("data-bs-content", criarConteudoPopover(disciplina).outerHTML);
+
+    botao["disciplina"] = disciplina;
+    botao["clicavel"] = true;
+
+    return botao;
+}
+
 function criarSeletor(nome, disciplinas, classeOutline, click) {
     const wrapper = document.createElement("div");
     const seletor = document.createElement("div");
@@ -375,15 +529,7 @@ function criarSeletor(nome, disciplinas, classeOutline, click) {
     seletor.append(pesquisa);
 
     disciplinas.forEach(disciplina => {
-        const botao = document.createElement("button");
-
-        botao.innerText = disciplina["codigo"];
-        botao.classList.add("btn");
-        botao.classList.add(classeOutline);
-        botao.onclick = click;
-
-        botao["disciplina"] = disciplina;
-        botao["clicavel"] = true;
+        const botao = criarItemSeletor(disciplina, classeOutline, click);
 
         itens.append(botao);
         hashBotoes[disciplina["id"]] = botao;
@@ -420,6 +566,9 @@ function criarSeletorFeitas(feitas) {
             botao["proximo"] = botao.nextElementSibling;
 
             $(botao.parentElement).prepend(botao);
+
+            if (!cookieInfo["feitas"].includes(disciplina["id"]))
+                cookieInfo["feitas"].push(disciplina["id"]);
         } else {
             botao.classList.remove(classeSelecionado);
             botao.classList.add(classeOutline);
@@ -428,6 +577,8 @@ function criarSeletorFeitas(feitas) {
                 botao.parentElement.insertBefore(botao, botao["proximo"]);
             else
                 $(botao.parentElement).append(botao);
+
+            cookieInfo["feitas"].splice(cookieInfo["feitas"].indexOf(disciplina["id"]), 1);
         }
 
         atualizarGrafo();
@@ -495,6 +646,8 @@ function criarSeletorEletivas(nome, disciplinas) {
             excluirDisciplinaGrafo(id).forEach(id_excluido => {
                 creditosEletivas[hashDisciplinas[id_excluido]["nome_grupo"]] -= hashDisciplinas[id_excluido]["creditos"];
                 deselecionarItemSeletor(hashBotoes[id_excluido], classeOutline, classeSelecionado);
+
+                cookieInfo["adicionadas"].splice(cookieInfo["adicionadas"].indexOf(id), 1);
             });
         } else {
             const novas_disciplinas = consertarPreRequisitos(hashDisciplinas[id]);
@@ -517,6 +670,9 @@ function criarSeletorEletivas(nome, disciplinas) {
             adicionar.forEach(novo_id => {
                 selecionarItemSeletor(hashBotoes[novo_id], classeOutline, classeSelecionado);
                 grafoDisciplinas.push(novo_id);
+
+                if (!cookieInfo["adicionadas"].includes(novo_id))
+                    cookieInfo["adicionadas"].push(novo_id);
 
                 if (!grupos_modificados.includes(hashDisciplinas[novo_id]["nome_grupo"])) {
                     grupos_modificados.push(hashDisciplinas[novo_id]["nome_grupo"]);
@@ -631,6 +787,12 @@ function configurarSeletores() {
         const seletor = criarSeletorEletivas(tipo, tiposDisciplinas[tipo]);
         seletores.append(seletor);
     });
+
+
+    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+    popoverTriggerList.map(function(popoverTriggerEl) {
+        return new bootstrap.Popover(popoverTriggerEl);
+    });
 }
 
 function excluirDisciplinaGrafoAux(id, excluidas) {
@@ -648,11 +810,54 @@ function excluirDisciplinaGrafo(id) {
     return excluidas;
 }
 
+function setCookie(name, value, days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
+}
+function getCookie(name) {
+    var nameEQ = name + "=";
+    var ca = document.cookie.split(';');
+    for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+function deleteCookie(name, path, domain) {
+    if (getCookie(name)) {
+        document.cookie = name + "=" +
+            ((path) ? ";path=" + path : "") +
+            ((domain) ? ";domain=" + domain : "") +
+            ";expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    }
+}
+
+function carregarCookies() {
+    const cookieInfoAtual = JSON.parse(getCookie("info"));
+    if (!$.isEmptyObject(cookieInfoAtual)) {
+        cookieInfo["feitas"] = cookieInfoAtual["feitas"];
+        cookieInfo["adicionadas"] = cookieInfoAtual["adicionadas"];
+    }
+
+    cookieInfo["feitas"].concat(cookieInfo["adicionadas"]).forEach(id => {
+        hashBotoes[id].click();
+    });
+
+    console.log(cookieInfo);
+}
+
 const hashDisciplinas = {};
 const hashBotoes = {};
 const grafoDisciplinas = [];
 const elementosDisciplinas = {};
 const creditosEletivas = {};
+const cookieInfo = { adicionadas: [], feitas: [] };
 
 $(document).ready(function() {
     const params = new URLSearchParams(window.location.search);
@@ -668,43 +873,13 @@ $(document).ready(function() {
                 hashDisciplinas[disciplina["id"]] = disciplina;
             });
 
+            consertarGrupos(JSON.parse(responseCurso));
+
             Object.keys(hashDisciplinas).forEach(id => {
                 consertarPreRequisitosTriviais(hashDisciplinas[id]);
-            })
 
-            const gruposDict = {};
-            JSON.parse(responseCurso).forEach(disciplina => {
-                const id = disciplina["id"];
-                const nome_grupo = disciplina["nome_grupo"];
-                const tipo_grupo = disciplina["tipo_grupo"];
-                const creditos_grupo = disciplina["creditos_grupo"];
-
-                if (nome_grupo in gruposDict)
-                    ++gruposDict[nome_grupo];
-                else
-                    gruposDict[nome_grupo] = 1;
-
-                disciplina = { ...disciplina, ...hashDisciplinas[id] };
-
-                if (Array.isArray(disciplina["nome_grupo"]))
-                    disciplina["nome_grupo"].push(nome_grupo);
-                else
-                    disciplina["nome_grupo"] = [nome_grupo];
-
-                if (Array.isArray(disciplina["tipo_grupo"]))
-                    disciplina["tipo_grupo"].push(tipo_grupo);
-                else
-                    disciplina["tipo_grupo"] = [tipo_grupo];
-
-                if (Array.isArray(disciplina["creditos_grupo"]))
-                    disciplina["creditos_grupo"].push(creditos_grupo);
-                else
-                    disciplina["creditos_grupo"] = [creditos_grupo];
-
-                hashDisciplinas[id] = disciplina;
-
-                if (disciplina["feita"] || disciplina["tipo_grupo"] == 0)
-                    grafoDisciplinas.push(id)
+                if (hashDisciplinas[id]["feita"] || hashDisciplinas[id]["tipo_grupo"] == 0)
+                    grafoDisciplinas.push(parseInt(id));
             });
 
             grafoDisciplinas.forEach(id => {
@@ -714,12 +889,9 @@ $(document).ready(function() {
                     consertarPreRequisitos(disciplina);
             });
 
-            Object.keys(hashDisciplinas).forEach(id => {
-                consertarGrupos(gruposDict, id);
-            });
-
-            criarElementosDisciplinas();
             configurarSeletores();
+
+            carregarCookies();
             atualizarGrafo();
         });
     });

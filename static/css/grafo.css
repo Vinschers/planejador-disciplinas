@@ -165,8 +165,7 @@ body {
     background-color: var(--gray-8);
     color: var(--gray-0);
 
-    transition: background-color 0.4s;
-    transition: transform 0.4s;
+    transition: background-color 0.2s, transform 0.4s;
 }
 .disciplina:not(:first-child) {
     margin-left: 2em;
@@ -199,9 +198,24 @@ body {
     right: calc(var(--tamanho) / 10 * 1em);
 }
 
+.disciplina.feita {
+    background-color: var(--green-9) !important;
+    border: 4px solid var(--green-4);
+}
+
+.disciplina.possivel {
+    border: 4px solid var(--orange-4);
+}
+
 .desativado {
     background-color: var(--gray-7) !important;
     color: var(--gray-6) !important;
+}
+
+.desativado.feita, .desativado.possivel {
+    background-color: var(--gray-7) !important;
+    color: var(--gray-6) !important;
+    border: 2px solid var(--gray-6);
 }
 
 
