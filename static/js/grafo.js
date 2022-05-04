@@ -418,7 +418,6 @@ function atualizarGrafo() {
         divGrafo.append(divLinha)
     });
 
-    // deleteCookie("info");
     setCookie("info", JSON.stringify(cookieInfo));
 }
 
@@ -568,8 +567,8 @@ function criarSeletorFeitas(feitas) {
 
             $(botao.parentElement).prepend(botao);
 
-            if (!cookieInfo["feitas"].includes(disciplina["id"]))
-                cookieInfo["feitas"].push(disciplina["id"]);
+            if (!cookieInfo[codUni][codCurso]["feitas"].includes(disciplina["id"]))
+                cookieInfo[codUni][codCurso]["feitas"].push(disciplina["id"]);
         } else {
             botao.classList.remove(classeSelecionado);
             botao.classList.add(classeOutline);
@@ -579,7 +578,7 @@ function criarSeletorFeitas(feitas) {
             else
                 $(botao.parentElement).append(botao);
 
-            cookieInfo["feitas"].splice(cookieInfo["feitas"].indexOf(disciplina["id"]), 1);
+            cookieInfo[codUni][codCurso]["feitas"].splice(cookieInfo[codUni][codCurso]["feitas"].indexOf(disciplina["id"]), 1);
         }
 
         botao["popover"].hide();
@@ -649,7 +648,7 @@ function criarSeletorEletivas(nome, disciplinas) {
                 creditosEletivas[hashDisciplinas[id_excluido]["nome_grupo"]] -= hashDisciplinas[id_excluido]["creditos"];
                 deselecionarItemSeletor(hashBotoes[id_excluido], classeOutline, classeSelecionado);
 
-                cookieInfo["adicionadas"].splice(cookieInfo["adicionadas"].indexOf(id), 1);
+                cookieInfo[codUni][codCurso]["adicionadas"].splice(cookieInfo[codUni][codCurso]["adicionadas"].indexOf(id), 1);
             });
         } else {
             const novas_disciplinas = consertarPreRequisitos(hashDisciplinas[id]);
@@ -673,8 +672,8 @@ function criarSeletorEletivas(nome, disciplinas) {
                 selecionarItemSeletor(hashBotoes[novo_id], classeOutline, classeSelecionado);
                 grafoDisciplinas.push(novo_id);
 
-                if (!cookieInfo["adicionadas"].includes(novo_id))
-                    cookieInfo["adicionadas"].push(novo_id);
+                if (!cookieInfo[codUni][codCurso]["adicionadas"].includes(novo_id))
+                    cookieInfo[codUni][codCurso]["adicionadas"].push(novo_id);
 
                 if (!grupos_modificados.includes(hashDisciplinas[novo_id]["nome_grupo"])) {
                     grupos_modificados.push(hashDisciplinas[novo_id]["nome_grupo"]);
@@ -837,12 +836,15 @@ function deleteCookie(name, path, domain) {
 
 function carregarCookies() {
     const cookieInfoAtual = JSON.parse(getCookie("info"));
-    if (!$.isEmptyObject(cookieInfoAtual)) {
-        cookieInfo["feitas"] = cookieInfoAtual["feitas"];
-        cookieInfo["adicionadas"] = cookieInfoAtual["adicionadas"];
-    }
+    if (!$.isEmptyObject(cookieInfoAtual))
+        cookieInfo = cookieInfoAtual;
 
-    cookieInfo["feitas"].concat(cookieInfo["adicionadas"]).forEach(id => {
+    if (!(codUni in cookieInfo))
+        cookieInfo[codUni] = {};
+    if (!(codCurso in cookieInfo[codUni]))
+        cookieInfo[codUni][codCurso] = {feitas: [], adicionadas: []};
+
+    cookieInfo[codUni][codCurso]["feitas"].concat(cookieInfo[codUni][codCurso]["adicionadas"]).forEach(id => {
         hashBotoes[id].click();
     });
 
@@ -854,15 +856,18 @@ const hashBotoes = {};
 const grafoDisciplinas = [];
 const elementosDisciplinas = {};
 const creditosEletivas = {};
-const cookieInfo = { adicionadas: [], feitas: [] };
+
+let cookieInfo = {};
+let codUni = 0;
+let codCurso = 0;
 
 $(document).ready(function() {
     const params = new URLSearchParams(window.location.search);
 
-    const codigoUniversidade = params.get("uni");
-    const codigoCurso = params.get("curso");
+    codUni = params.get("uni");
+    codCurso = params.get("curso");
 
-    $.get("/db/getDisciplinasCurso", { uni: codigoUniversidade, curso: codigoCurso }, responseCurso => {
+    $.get("/db/getDisciplinasCurso", { uni: codUni, curso: codCurso }, responseCurso => {
         $.get("/db/getTodasDisciplinas", responseTodas => {
 
             JSON.parse(responseTodas).forEach(disciplina => {
