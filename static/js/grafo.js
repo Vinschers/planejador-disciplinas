@@ -1,100 +1,170 @@
+function getPreRequisitos(disciplina) {
+    return disciplina["pre_requisitos"][disciplina["lista_pre_requisitos"]];
+}
+
+function printarPreRequisitos(disciplina) {
+    let str = "";
+    disciplina["pre_requisitos"].forEach(lista => {
+        codigos = [];
+
+        lista.forEach(id => {
+            codigos.push(hashDisciplinas[id]["codigo"]);
+        });
+
+        str += ", [" + codigos.join(", ") + "]";
+    });
+
+    console.log(disciplina["codigo"] + ": " + str.substring(2, str.length));
+}
+
 function desmembrarPreRequisitos(pre_requisitos) {
     const desmembrados = [];
+    const dict_possibilidades = {};
 
     pre_requisitos.forEach(pre_req => {
         const pre_req_split = pre_req.split(" ");
         const possibilidade = parseInt(pre_req_split[0]);
         const pre_req_id = parseInt(pre_req_split[1]);
 
-        if (desmembrados.length < possibilidade + 1)
-            desmembrados.push([pre_req_id]);
+        if (possibilidade in dict_possibilidades)
+            dict_possibilidades[possibilidade].push(pre_req_id);
         else
-            desmembrados[possibilidade].push(pre_req_id);
-    })
+            dict_possibilidades[possibilidade] = [pre_req_id];
+    });
+
+    Object.keys(dict_possibilidades).forEach(possibilidade => {
+        desmembrados.push(dict_possibilidades[possibilidade]);
+    });
 
     return desmembrados;
 }
 
-function calcularDistanciaPreRequisito(disciplinas, aparentes, lista) {
-    let distancia = 0;
+function consertarPreRequisitosTriviais(disciplina) {
+    const pre_requisitos = desmembrarPreRequisitos(disciplina["pre_requisitos"]);
+    const possiveis = [];
 
-    lista.forEach(id => {
-        if (aparentes.includes(id))
-            ++distancia;
-        else if (!disciplinas[id]["feita"]) {
-            let menorDistancia = 1 << 31;
-
-            if (disciplinas[id]["pre_requisitos"].length > 0 && !Array.isArray(disciplinas[id]["pre_requisitos"]))
-                distancia += calcularDistanciaPreRequisito(disciplinas, aparentes, disciplinas[id]["pre_requisitos"])
-            else if (disciplinas[id]["pre_requisitos"].length > 0) {
-                disciplinas[id]["pre_requisitos"].forEach(pre_reqs => {
-                    const distanciaAtual = calcularDistanciaPreRequisito(disciplinas, aparentes, pre_reqs);
-
-                    if (distanciaAtual < menorDistancia)
-                        menorDistancia = distanciaAtual;
-                });
-
-                if (menorDistancia < 1 << 31)
-                    distancia += menorDistancia;
-            }
+    pre_requisitos.forEach(lista => {
+        for (let i = 0; i < lista.length; ++i) {
+            if (!(lista[i] in hashDisciplinas))
+                return;
         }
+
+        possiveis.push(lista);
     });
 
-    return distancia;
-}
-
-function consertarPreRequisitos(disciplinas, aparentes, ids) {
-    let terminou = false;
-    const novas_aparentes = [];
-
-    while (!terminou) {
-        terminou = true;
-
-        ids.forEach(id => {
-            const disciplina = disciplinas[id];
-            const listas = disciplina["pre_requisitos"];
-
-            if (listas.length > 0 && Array.isArray(listas[0])) {
-                terminou = false;
-
-                if (listas.length == 1) {
-                    disciplina["pre_requisitos"] = listas[0];
-                    return;
-                }
-
-                for (let i = 0; i < listas.length; ++i) {
-                    const lista = listas[i];
-                    let estaoAparentes = true;
-
-                    for (let j = 0; j < lista.length && estaoAparentes; ++j) {
-                        const pre_req = lista[j];
-
-                        if (!aparentes.includes(pre_req))
-                            estaoAparentes = false;
-                    }
-
-                    if (estaoAparentes) {
-                        disciplina["pre_requisitos"] = lista;
-                        return;
-                    }
-                }
-            }
-
-            listas.forEach(pre_req => {
-                if (!aparentes.includes(pre_req))
-                    novas_aparentes.push(pre_req);
-            });
-        });
+    if (possiveis.length == 0) {
+        disciplina["pre_requisitos"] = [[]];
+    } else {
+        disciplina["pre_requisitos"] = possiveis;
     }
 
-    return novas_aparentes;
+    disciplina["lista_pre_requisitos"] = 0;
+}
+
+function consertarPreRequisitos(disciplina) {
+    const possibilidades_pre_reqs_novos = [];
+    const listas_pre_reqs = disciplina["pre_requisitos"];
+
+    listas_pre_reqs.forEach(lista => {
+        let possibilidade = [];
+
+        lista.forEach(id => {
+            if (!grafoDisciplinas.includes(id)) {
+                possibilidade = possibilidade.concat(consertarPreRequisitos(hashDisciplinas[id]));
+                possibilidade.push(id);
+            }
+        });
+
+        possibilidades_pre_reqs_novos.push(possibilidade);
+    });
+
+    disciplina["lista_pre_requisitos"] = 0;
+    let pre_reqs_novos = possibilidades_pre_reqs_novos[0];
+
+    for (let i = 0; i < possibilidades_pre_reqs_novos.length; ++i) {
+        if (possibilidades_pre_reqs_novos[i].length < possibilidades_pre_reqs_novos[disciplina["lista_pre_requisitos"]]) {
+            disciplina["lista_pre_requisitos"] = i;
+            pre_reqs_novos = possibilidades_pre_reqs_novos[i];
+        }
+    }
+
+    return pre_reqs_novos;
+}
+
+function consertarGrupo(gruposDict, id) {
+    const disciplina = hashDisciplinas[id];
+
+    let nome_grupo = disciplina["nome_grupo"][0];
+    let tipo_grupo = disciplina["tipo_grupo"][0];
+    let creditos_grupo = disciplina["creditos_grupo"][0];
+
+    for (let i = 0; i < disciplina["nome_grupo"].length; ++i) {
+        const nome = disciplina["nome_grupo"][i];
+        const tipo = disciplina["tipo_grupo"][i];
+        const creditos = disciplina["creditos_grupo"][i];
+
+        if (gruposDict[nome] < gruposDict[nome_grupo] || tipo == 0) {
+            nome_grupo = nome;
+            tipo_grupo = tipo;
+            creditos_grupo = creditos;
+        }
+
+        if (tipo == 0)
+            break;
+    }
+
+    disciplina["nome_grupo"] = nome_grupo;
+    disciplina["tipo_grupo"] = tipo_grupo;
+    disciplina["creditos_grupo"] = creditos_grupo;
+}
+
+function consertarGrupos(disciplinasCurso) {
+    const gruposDict = {};
+
+    disciplinasCurso.forEach(disciplina => {
+
+        const id = disciplina["id"];
+        const nome_grupo = disciplina["nome_grupo"];
+        const tipo_grupo = disciplina["tipo_grupo"];
+        const creditos_grupo = disciplina["creditos_grupo"];
+
+        if (nome_grupo in gruposDict)
+            ++gruposDict[nome_grupo];
+        else
+            gruposDict[nome_grupo] = 1;
+
+        disciplina = { ...disciplina, ...hashDisciplinas[id] };
+
+        if (Array.isArray(disciplina["nome_grupo"]))
+            disciplina["nome_grupo"].push(nome_grupo);
+        else
+            disciplina["nome_grupo"] = [nome_grupo];
+
+        if (Array.isArray(disciplina["tipo_grupo"]))
+            disciplina["tipo_grupo"].push(tipo_grupo);
+        else
+            disciplina["tipo_grupo"] = [tipo_grupo];
+
+        if (Array.isArray(disciplina["creditos_grupo"]))
+            disciplina["creditos_grupo"].push(creditos_grupo);
+        else
+            disciplina["creditos_grupo"] = [creditos_grupo];
+
+        hashDisciplinas[id] = disciplina;
+    });
+
+    Object.keys(hashDisciplinas).forEach(id => {
+        consertarGrupo(gruposDict, id);
+    });
 }
 
 function inverterGrafo(disciplinasObj) {
     const grafoInvertido = {};
 
     for (let [id, disciplina] of Object.entries(disciplinasObj)) {
-        disciplina["pre_requisitos"].forEach(pre_req => {
+        const pre_requisitos = getPreRequisitos(disciplina);
+
+        pre_requisitos.forEach(pre_req => {
             if (!(pre_req in grafoInvertido))
                 grafoInvertido[pre_req] = [id];
             else
@@ -115,9 +185,10 @@ function ordenacaoTopologicaAux(disciplinasObj, disciplinasOrdenadas, visitado, 
 
         terminou = false;
         let ehPossivel = true;
+        const pre_requisitos = getPreRequisitos(disciplinasObj[id]);
 
-        for (let i = 0; i < disciplinasObj[id]["pre_requisitos"].length; ++i)
-            if (!visitado[disciplinasObj[id]["pre_requisitos"][i]]) {
+        for (let i = 0; i < pre_requisitos.length; ++i)
+            if (!visitado[pre_requisitos[i]]) {
                 ehPossivel = false;
                 break;
             }
@@ -192,7 +263,7 @@ function criarElementoDisciplina(disciplina) {
     elemento.classList.add(getClasseDisciplina(disciplina["codigo"]));
     elemento.innerHTML += `<span class="codigo">${disciplina["codigo"]}</span>`;
 
-    if (disciplina["nome"].length > 30)
+    if (disciplina["nome"].length > 27)
         elemento.innerHTML += `<span class="nome">${disciplina["nome"]}</span>`;
     else
         elemento.innerHTML += `<span class="nome grande">${disciplina["nome"]}</span>`;
@@ -203,131 +274,171 @@ function criarElementoDisciplina(disciplina) {
     return elemento;
 }
 
-function desativarElementos(elementos) {
-    Object.keys(elementos).forEach(id => {
-        elementos[id].classList.add("desativado");
+function desativarElementos() {
+    Object.keys(elementosDisciplinas).forEach(id => {
+        elementosDisciplinas[id].classList.add("desativado");
     });
 }
 
-function ativarElementos(elementos) {
-    Object.keys(elementos).forEach(id => {
-        elementos[id].classList.remove("desativado");
+function ativarElementos() {
+    Object.keys(elementosDisciplinas).forEach(id => {
+        elementosDisciplinas[id].classList.remove("desativado");
     });
 }
 
-function ativarElemento(elementos, id, mostrarPreReqs, mostrarConsequencias) {
-    elementos[id].classList.remove("desativado");
+function ativarElemento(id, mostrarPreReqs, mostrarConsequencias) {
+    elementosDisciplinas[id].classList.remove("desativado");
+    const disciplina = hashDisciplinas[id];
 
     if (mostrarConsequencias) {
-        elementos[id]["disciplina"]["consequencias"].forEach(con => {
-            ativarElemento(elementos, con, false, true);
+        disciplina["consequencias"].forEach(con => {
+            ativarElemento(con, false, true);
         });
     }
 
     if (mostrarPreReqs) {
-        elementos[id]["disciplina"]["pre_requisitos"].forEach(pre_req => {
-            ativarElemento(elementos, pre_req, true, false);
+        const pre_requisitos = getPreRequisitos(disciplina);
+        pre_requisitos.forEach(pre_req => {
+            ativarElemento(pre_req, true, false);
         })
     }
 }
 
-function criarElementosDisciplinas(grafo) {
-    const elementos = {};
-
-    Object.keys(grafo).forEach(id => {
-        const disciplina = grafo[id];
+function criarElementosDisciplinas() {
+    Object.keys(hashDisciplinas).forEach(id => {
+        const disciplina = hashDisciplinas[id];
         const elemento = criarElementoDisciplina(disciplina);
 
         elemento.onmouseenter = function(e) {
             if ("disciplina" in e.target) {
-                desativarElementos(elementos);
-                ativarElemento(elementos, e.target["disciplina"]["id"], true, true);
+                desativarElementos();
+                ativarElemento(e.target["disciplina"]["id"], true, true);
             }
         }
 
         elemento.onmouseleave = function(e) {
             if ("disciplina" in e.target)
-                ativarElementos(elementos);
+                ativarElementos();
         }
 
-        elementos[disciplina["id"]] = elemento;
+        elementosDisciplinas[disciplina["id"]] = elemento;
     })
-
-    return elementos;
 }
 
-function atualizarDisciplinas(ids) {
-    const divGrafo = document.getElementById("grafo");
+function criarHashGrafoDisciplinas() {
+    const hash = {};
 
-    const todasDisciplinas = divGrafo["todasDisciplinas"];
-    const disciplinasAparentes = divGrafo["disciplinasAparentes"];
-
-    ids.forEach(id => {
-        if (disciplinasAparentes.includes(id))
-            disciplinasAparentes.splice(disciplinasAparentes.indexOf(id), 1);
-        else
-            disciplinasAparentes.push(id);
+    grafoDisciplinas.forEach(id => {
+        hash[id] = hashDisciplinas[id];
     });
 
-    const todasDisciplinasConsertadas = new Object(todasDisciplinas);
-    const novas_aparentes = consertarPreRequisitos(todasDisciplinasConsertadas, disciplinasAparentes, disciplinasAparentes);
-    const aparentes = {};
-
-    disciplinasAparentes.forEach(id => aparentes[id] = todasDisciplinasConsertadas[id]);
-    novas_aparentes.forEach(id => aparentes[id] = todasDisciplinasConsertadas[id]);
-
-    const grafoConsequencias = inverterGrafo(aparentes);
-    divGrafo["disciplinasAparentes"] = [];
-
-    Object.keys(aparentes).forEach(id => {
-        if (id in grafoConsequencias)
-            aparentes[id]["consequencias"] = grafoConsequencias[id];
-        else
-            aparentes[id]["consequencias"] = [];
-
-        divGrafo["disciplinasAparentes"].push(parseInt(id));
-    });
-
-    return aparentes;
+    return hash;
 }
 
-function atualizarGrafo(ids, embaralhar) {
+function getConsequenciasTotais(disciplina) {
+    let qtdConsequencias = disciplina["consequencias"].length;
+
+    disciplina["consequencias"].forEach(consequencia => {
+        qtdConsequencias += getConsequenciasTotais(hashDisciplinas[consequencia]);
+    });
+
+    return qtdConsequencias;
+}
+
+function atualizarElementosDisciplinas() {
+    if ($.isEmptyObject(elementosDisciplinas)) {
+        criarElementosDisciplinas();
+    }
+
+    grafoDisciplinas.forEach(id => {
+        const disciplina = hashDisciplinas[id];
+
+        if (disciplina["feita"])
+            elementosDisciplinas[id].classList.add("feita");
+        else
+            elementosDisciplinas[id].classList.remove("feita");
+    });
+
+    grafoDisciplinas.forEach(id => {
+        const disciplina = hashDisciplinas[id];
+
+        let possivel = true;
+        getPreRequisitos(disciplina).forEach(pre_req => {
+            if (!hashDisciplinas[pre_req]["feita"])
+                possivel = false;
+        });
+
+        if (possivel && !disciplina["feita"])
+            elementosDisciplinas[id].classList.add("possivel");
+        else
+            elementosDisciplinas[id].classList.remove("possivel");
+    });
+}
+
+function atualizarGrafo() {
     const divGrafo = document.getElementById("grafo");
-    const elementos = divGrafo["elementos"];
-
-    const aparentes = atualizarDisciplinas(ids);
-
     divGrafo.innerHTML = "";
 
-    const ordenado = ordenacaoTopologica(aparentes);
+    const hashGrafoDisciplinas = criarHashGrafoDisciplinas();
+    const grafoConsequencias = inverterGrafo(hashGrafoDisciplinas);
 
-    if (embaralhar) {
-        for (let i = 0; i < ordenado.length; ++i)
-            ordenado[i].sort(() => Math.random() - 0.5);
+    grafoDisciplinas.forEach(id => {
+        if (id in grafoConsequencias)
+            hashDisciplinas[id]["consequencias"] = grafoConsequencias[id];
+        else
+            hashDisciplinas[id]["consequencias"] = [];
+    });
+
+    const ordenado = ordenacaoTopologica(hashGrafoDisciplinas);
+
+    for (let i = 0; i < ordenado.length; ++i) {
+        ordenado[i].sort((idA, idB) => {
+            const disciplinaA = hashDisciplinas[idA];
+            const disciplinaB = hashDisciplinas[idB];
+
+            const diffFeita = disciplinaA["feita"] - disciplinaB["feita"];
+
+            if (diffFeita != 0)
+                return diffFeita;
+
+            const qtdConA = getConsequenciasTotais(disciplinaA);
+            const qtdConB = getConsequenciasTotais(disciplinaB);
+            return qtdConB - qtdConA;
+        });
     }
+
+    atualizarElementosDisciplinas();
 
     ordenado.forEach(linha => {
         const divLinha = criarDivLinhaDisciplinas();
         linha.forEach(disciplina => {
-            divLinha.appendChild(elementos[disciplina]);
+            divLinha.appendChild(elementosDisciplinas[disciplina]);
         });
         div = divLinha;
         divGrafo.append(divLinha)
     });
+
+    // deleteCookie("info");
+    setCookie("info", JSON.stringify(cookieInfo));
 }
 
 function pesquisarSeletor(evento) {
     const input = evento.target;
-    const pesquisa = input.value;
+    const pesquisa = input.value.toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 
     const divPesquisa = input.parentElement;
     const seletor = divPesquisa.parentElement;
-    const itens = seletor.lastChild;
+    const itens = seletor.children[1];
 
     for (let i = 0; i < itens.children.length; ++i) {
         const btnDisciplina = itens.children[i];
+        const disciplina = btnDisciplina["disciplina"];
 
-        if (!btnDisciplina.innerText.toUpperCase().includes(pesquisa.toUpperCase())) {
+        const codigo = disciplina["codigo"].toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+        const nome = disciplina["nome"].toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+        const descricao = disciplina["descricao"].toUpperCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
+        if (!(codigo.includes(pesquisa) || nome.includes(pesquisa) || descricao.includes(pesquisa))) {
             btnDisciplina.style.display = "none";
         } else {
             btnDisciplina.style.display = "inline-block";
@@ -350,12 +461,65 @@ function criarCaixaDePesquisa() {
     return divPesquisa;
 }
 
+function criarConteudoPopover(disciplina) {
+    const wrapper = document.createElement("div");
+    const nome = document.createElement("h5");
+    const creditos = document.createElement("h6");
+    const pre_requisitos = document.createElement("h6");
+    const descricao = document.createElement("span");
+
+    consertarPreRequisitos(disciplina);
+    const codigos_pre_requisitos = [];
+
+    disciplina["pre_requisitos"][disciplina["lista_pre_requisitos"]].forEach(id => {
+        codigos_pre_requisitos.push(hashDisciplinas[id]["codigo"]);
+    });
+
+    nome.innerText = disciplina["nome"];
+    creditos.innerText = disciplina["creditos"] + " créditos";
+    pre_requisitos.innerText = "Pré-requisitos: " + codigos_pre_requisitos.join(", ");
+    descricao.innerText = disciplina["descricao"];
+
+    wrapper.appendChild(nome);
+    wrapper.appendChild(creditos);
+
+    if (codigos_pre_requisitos.length > 0)
+        wrapper.appendChild(pre_requisitos);
+
+    wrapper.appendChild(descricao);
+
+    return wrapper;
+}
+
+function criarItemSeletor(disciplina, classeOutline, click) {
+    const botao = document.createElement("button");
+
+    botao.innerText = disciplina["codigo"];
+    botao.classList.add("btn");
+    botao.classList.add(classeOutline);
+    botao.onclick = click;
+
+    botao.setAttribute("data-bs-toggle", "popover");
+    botao.setAttribute("data-bs-trigger", "hover");
+    botao.setAttribute("data-bs-html", "true");
+
+    botao.setAttribute("title", disciplina["codigo"]);
+    botao.setAttribute("data-bs-content", criarConteudoPopover(disciplina).outerHTML);
+
+    botao["disciplina"] = disciplina;
+    botao["clicavel"] = true;
+    botao["popover"] = new bootstrap.Popover(botao);
+
+    return botao;
+}
+
 function criarSeletor(nome, disciplinas, classeOutline, click) {
     const wrapper = document.createElement("div");
     const seletor = document.createElement("div");
     const titulo = document.createElement("h2");
     const pesquisa = criarCaixaDePesquisa();
     const itens = document.createElement("div");
+    const contadorCreditos = document.createElement("h4");
 
     wrapper.classList.add("seletorWrapper");
     seletor.classList.add("seletorDisciplinas");
@@ -366,19 +530,19 @@ function criarSeletor(nome, disciplinas, classeOutline, click) {
     seletor.append(pesquisa);
 
     disciplinas.forEach(disciplina => {
-        const botao = document.createElement("button");
-
-        botao.innerText = disciplina["codigo"];
-        botao.classList.add("btn");
-        botao.classList.add(classeOutline);
-        botao.onclick = click;
-
-        botao["disciplina"] = disciplina;
+        const botao = criarItemSeletor(disciplina, classeOutline, click);
 
         itens.append(botao);
-
+        hashBotoes[disciplina["id"]] = botao;
     });
+
     seletor.append(itens);
+
+    if (disciplinas[0]["creditos_grupo"]) {
+        contadorCreditos.innerText = "0/" + disciplinas[0]["creditos_grupo"];
+        contadorCreditos.id = "creditos-" + nome;
+        seletor.append(contadorCreditos);
+    }
 
     wrapper.append(titulo);
     wrapper.append(seletor);
@@ -403,6 +567,9 @@ function criarSeletorFeitas(feitas) {
             botao["proximo"] = botao.nextElementSibling;
 
             $(botao.parentElement).prepend(botao);
+
+            if (!cookieInfo["feitas"].includes(disciplina["id"]))
+                cookieInfo["feitas"].push(disciplina["id"]);
         } else {
             botao.classList.remove(classeSelecionado);
             botao.classList.add(classeOutline);
@@ -411,10 +578,59 @@ function criarSeletorFeitas(feitas) {
                 botao.parentElement.insertBefore(botao, botao["proximo"]);
             else
                 $(botao.parentElement).append(botao);
+
+            cookieInfo["feitas"].splice(cookieInfo["feitas"].indexOf(disciplina["id"]), 1);
         }
 
+        botao["popover"].hide();
         atualizarGrafo();
     });
+}
+
+function ativarNovosItens(itens, classeOutline) {
+    Array.from(itens.children).forEach(item => {
+        if (item.classList.contains(classeOutline)) {
+            item.classList.remove("seletor-desativado");
+            item["clicavel"] = true;
+        }
+    })
+}
+
+function desativarNovosItens(itens, classeOutline) {
+    Array.from(itens.children).forEach(item => {
+        if (item.classList.contains(classeOutline)) {
+            item.classList.add("seletor-desativado");
+            item["clicavel"] = false;
+        }
+    })
+}
+
+function selecionarItemSeletor(item, classeOutline, classeSelecionado) {
+    item.classList.remove(classeOutline);
+    item.classList.add(classeSelecionado);
+
+    item["index"] = Array.from(item.parentElement.children).indexOf(item);
+
+    $(item.parentElement).prepend(item);
+}
+
+function deselecionarItemSeletor(item, classeOutline, classeSelecionado) {
+    item.classList.remove(classeSelecionado);
+    item.classList.add(classeOutline);
+
+    if (item["index"] + 1 < item.parentElement.children.length)
+        item.parentElement.insertBefore(item, item.parentElement.children[item["index"] + 1]);
+    else
+        $(item.parentElement).append(item);
+
+    const id = item["disciplina"]["id"];
+    const nome = item["disciplina"]["nome_grupo"];
+
+    const creditos_seletor = document.getElementById("creditos-" + nome);
+    creditos_seletor.innerText = creditosEletivas[nome] + "/" + hashDisciplinas[id]["creditos_grupo"];
+
+    if (creditosEletivas[nome] + item["disciplina"]["creditos"] == hashDisciplinas[id]["creditos_grupo"])
+        ativarNovosItens(item.parentElement, classeOutline);
 }
 
 function criarSeletorEletivas(nome, disciplinas) {
@@ -422,28 +638,65 @@ function criarSeletorEletivas(nome, disciplinas) {
     const classeSelecionado = "btn-primary";
 
     return criarSeletor(nome, disciplinas, classeOutline, function(e) {
-        const divGrafo = document.getElementById("grafo");
-        const aparentes = divGrafo["disciplinasAparentes"];
         const botao = e.target;
-        const disciplina = botao["disciplina"];
+        const id = botao["disciplina"]["id"];
 
-        if (aparentes.includes(disciplina["id"])) {
-            botao.classList.remove(classeSelecionado);
-            botao.classList.add(classeOutline);
+        if (!botao["clicavel"])
+            return;
 
-            if (botao["proximo"])
-                botao.parentElement.insertBefore(botao, botao["proximo"]);
-            else
-                $(botao.parentElement).append(botao);
+        if (grafoDisciplinas.includes(id)) {
+            excluirDisciplinaGrafo(id).forEach(id_excluido => {
+                creditosEletivas[hashDisciplinas[id_excluido]["nome_grupo"]] -= hashDisciplinas[id_excluido]["creditos"];
+                deselecionarItemSeletor(hashBotoes[id_excluido], classeOutline, classeSelecionado);
+
+                cookieInfo["adicionadas"].splice(cookieInfo["adicionadas"].indexOf(id), 1);
+            });
         } else {
-            botao.classList.remove(classeOutline);
-            botao.classList.add(classeSelecionado);
-            botao["proximo"] = botao.nextElementSibling;
+            const novas_disciplinas = consertarPreRequisitos(hashDisciplinas[id]);
+            const adicionar = [];
 
-            $(botao.parentElement).prepend(botao);
+            novas_disciplinas.concat([id]).forEach(novo_id => {
+                const disciplina = hashDisciplinas[novo_id]
+                const nome_atual = disciplina["nome_grupo"];
+
+                if (creditosEletivas[nome_atual] + disciplina["creditos"] <= disciplina["creditos_grupo"]) {
+                    creditosEletivas[nome_atual] += disciplina["creditos"];
+                    adicionar.push(novo_id);
+                }
+            });
+
+            const grupos_modificados = [];
+            const creditos_grupos = [];
+            const itens_grupos = [];
+
+            adicionar.forEach(novo_id => {
+                selecionarItemSeletor(hashBotoes[novo_id], classeOutline, classeSelecionado);
+                grafoDisciplinas.push(novo_id);
+
+                if (!cookieInfo["adicionadas"].includes(novo_id))
+                    cookieInfo["adicionadas"].push(novo_id);
+
+                if (!grupos_modificados.includes(hashDisciplinas[novo_id]["nome_grupo"])) {
+                    grupos_modificados.push(hashDisciplinas[novo_id]["nome_grupo"]);
+                    creditos_grupos.push(hashDisciplinas[novo_id]["creditos_grupo"]);
+                    itens_grupos.push(hashBotoes[novo_id].parentElement);
+                }
+            });
+
+            for (let i = 0; i < grupos_modificados.length; ++i) {
+                const creditos_grupo = creditos_grupos[i];
+                const grupo = grupos_modificados[i];
+
+                const creditos_seletor = document.getElementById("creditos-" + grupo);
+                creditos_seletor.innerText = creditosEletivas[grupo] + "/" + creditos_grupo;
+
+                if (creditosEletivas[grupo] == creditos_grupo)
+                    desativarNovosItens(itens_grupos[i], classeOutline);
+            }
         }
 
-        atualizarGrafo([disciplina["id"]], false);
+        botao["popover"].hide();
+        atualizarGrafo();
     });
 }
 
@@ -507,21 +760,16 @@ function ordenarComNumeraisRomanos(data, order) {
     });
 }
 
-function configurarSeletores(disciplinas) {
-    const divGrafo = document.getElementById("grafo");
-
-    const todasDisciplinas = divGrafo["todasDisciplinas"];
-    const disciplinasAparentes = divGrafo["disciplinasAparentes"];
-
+function configurarSeletores() {
     const tiposDisciplinas = {};
     const disciplinasFeitas = [];
 
-    disciplinasAparentes.forEach(id => {
-        disciplinasFeitas.push(todasDisciplinas[id]);
+    grafoDisciplinas.forEach(id => {
+        disciplinasFeitas.push(hashDisciplinas[id]);
     });
 
-    Object.keys(disciplinas).forEach(id => {
-        const disciplina = disciplinas[id];
+    Object.keys(hashDisciplinas).forEach(id => {
+        const disciplina = hashDisciplinas[id];
 
         if (disciplina["tipo_grupo"] == 0)
             return;
@@ -538,23 +786,75 @@ function configurarSeletores(disciplinas) {
     seletores.append(feitas);
 
     ordenarComNumeraisRomanos(Object.keys(tiposDisciplinas)).forEach(tipo => {
+        creditosEletivas[tipo] = 0;
         const seletor = criarSeletorEletivas(tipo, tiposDisciplinas[tipo]);
         seletores.append(seletor);
-    })
+    });
 }
 
-function getDisciplinasAparentes(disciplinas) {
-    const disciplinasAparentes = [];
+function excluirDisciplinaGrafoAux(id, excluidas) {
+    hashDisciplinas[id]["consequencias"].forEach(consequencia => {
+        excluirDisciplinaGrafoAux(consequencia, excluidas);
+    })
 
-    Object.keys(disciplinas).forEach(id => {
-        const disciplina = disciplinas[id];
+    grafoDisciplinas.splice(grafoDisciplinas.indexOf(id), 1);
+    excluidas.push(id);
+}
 
-        if (disciplina["feita"] || disciplina["tipo_grupo"] == 0)
-            disciplinasAparentes.push(disciplina["id"]);
+function excluirDisciplinaGrafo(id) {
+    const excluidas = [];
+    excluirDisciplinaGrafoAux(id, excluidas);
+    return excluidas;
+}
+
+function setCookie(name, value, days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
+}
+function getCookie(name) {
+    var nameEQ = name + "=";
+    var ca = document.cookie.split(';');
+    for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+function deleteCookie(name, path, domain) {
+    if (getCookie(name)) {
+        document.cookie = name + "=" +
+            ((path) ? ";path=" + path : "") +
+            ((domain) ? ";domain=" + domain : "") +
+            ";expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    }
+}
+
+function carregarCookies() {
+    const cookieInfoAtual = JSON.parse(getCookie("info"));
+    if (!$.isEmptyObject(cookieInfoAtual)) {
+        cookieInfo["feitas"] = cookieInfoAtual["feitas"];
+        cookieInfo["adicionadas"] = cookieInfoAtual["adicionadas"];
+    }
+
+    cookieInfo["feitas"].concat(cookieInfo["adicionadas"]).forEach(id => {
+        hashBotoes[id].click();
     });
 
-    return disciplinasAparentes;
+    console.log(cookieInfo);
 }
+
+const hashDisciplinas = {};
+const hashBotoes = {};
+const grafoDisciplinas = [];
+const elementosDisciplinas = {};
+const creditosEletivas = {};
+const cookieInfo = { adicionadas: [], feitas: [] };
 
 $(document).ready(function() {
     const params = new URLSearchParams(window.location.search);
@@ -562,40 +862,34 @@ $(document).ready(function() {
     const codigoUniversidade = params.get("uni");
     const codigoCurso = params.get("curso");
 
-    $.get("/db/getDisciplinas", { uni: codigoUniversidade, curso: codigoCurso }, responseCurso => {
+    $.get("/db/getDisciplinasCurso", { uni: codigoUniversidade, curso: codigoCurso }, responseCurso => {
         $.get("/db/getTodasDisciplinas", responseTodas => {
-            const disciplinasCurso = {};
-            JSON.parse(responseCurso).forEach(disciplina => {
-                const id = disciplina["id"];
 
-                if (id in disciplinasCurso) {
-                    if (disciplinasCurso[id]["tipo_grupo"] != 0)
-                        disciplinasCurso[id] = disciplina;
-                } else {
-                    disciplina["feita"] = false;
-                    disciplinasCurso[id] = disciplina;
-                }
-            });
-
-            const todasDisciplinas = {};
             JSON.parse(responseTodas).forEach(disciplina => {
                 disciplina["feita"] = false;
-                disciplina["pre_requisitos"] = desmembrarPreRequisitos(disciplina["pre_requisitos"]);
-
-                todasDisciplinas[disciplina["id"]] = disciplina;
+                hashDisciplinas[disciplina["id"]] = disciplina;
             });
 
-            const divGrafo = document.getElementById("grafo");
-            const elementos = criarElementosDisciplinas(todasDisciplinas);
+            consertarGrupos(JSON.parse(responseCurso));
 
-            divGrafo["todasDisciplinas"] = todasDisciplinas;
-            divGrafo["disciplinasAparentes"] = [];
-            divGrafo["elementos"] = elementos;
+            Object.keys(hashDisciplinas).forEach(id => {
+                consertarPreRequisitosTriviais(hashDisciplinas[id]);
 
-            const aparentes = getDisciplinasAparentes(disciplinasCurso);
+                if (hashDisciplinas[id]["feita"] || hashDisciplinas[id]["tipo_grupo"] == 0)
+                    grafoDisciplinas.push(parseInt(id));
+            });
 
-            atualizarGrafo(aparentes, true);
-            configurarSeletores(disciplinasCurso);
+            grafoDisciplinas.forEach(id => {
+                const disciplina = hashDisciplinas[id];
+
+                if (disciplina["pre_requisitos"].length > 1)
+                    consertarPreRequisitos(disciplina);
+            });
+
+            configurarSeletores();
+
+            carregarCookies();
+            atualizarGrafo();
         });
     });
 });

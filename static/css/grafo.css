@@ -102,6 +102,24 @@ body {
     max-width: 5vw;
 }
 
+.seletor-desativado {
+    color: var(--gray-6);
+    border-color: var(--gray-6);
+    background-color: white;
+    box-shadow: none;
+}
+.seletor-desativado:hover, .seletor-desativado:focus, .seletor-desativado:focus-within, .seletor-desativado:focus-visible, .seletor-desativado:active {
+    outline: none;
+    box-shadow: none;
+    cursor: default;
+    color: var(--gray-6);
+    border-color: var(--gray-6);
+    background-color: white;
+}
+.btn-outline-primary:focus {
+    box-shadow: none !important;
+}
+
 #grafo {
     margin-top: 4vh;
     padding: 1vw;
@@ -147,8 +165,7 @@ body {
     background-color: var(--gray-8);
     color: var(--gray-0);
 
-    transition: background-color 0.4s;
-    transition: transform 0.4s;
+    transition: background-color 0.2s, transform 0.4s;
 }
 .disciplina:not(:first-child) {
     margin-left: 2em;
@@ -181,9 +198,25 @@ body {
     right: calc(var(--tamanho) / 10 * 1em);
 }
 
+.disciplina.feita {
+    background-color: var(--green-9) !important;
+    color: var(--gray-0) !important;
+    border: 4px solid var(--green-4);
+}
+
+.disciplina.possivel {
+    border: 4px solid var(--orange-4);
+}
+
 .desativado {
     background-color: var(--gray-7) !important;
     color: var(--gray-6) !important;
+}
+
+.desativado.feita, .desativado.possivel {
+    background-color: var(--gray-7) !important;
+    color: var(--gray-6) !important;
+    border: 2px solid var(--gray-6);
 }
 
 
