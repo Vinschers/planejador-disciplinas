@@ -508,6 +508,7 @@ function criarItemSeletor(disciplina, classeOutline, click) {
 
     botao["disciplina"] = disciplina;
     botao["clicavel"] = true;
+    botao["popover"] = new bootstrap.Popover(botao);
 
     return botao;
 }
@@ -581,6 +582,7 @@ function criarSeletorFeitas(feitas) {
             cookieInfo["feitas"].splice(cookieInfo["feitas"].indexOf(disciplina["id"]), 1);
         }
 
+        botao["popover"].hide();
         atualizarGrafo();
     });
 }
@@ -693,6 +695,7 @@ function criarSeletorEletivas(nome, disciplinas) {
             }
         }
 
+        botao["popover"].hide();
         atualizarGrafo();
     });
 }
@@ -786,12 +789,6 @@ function configurarSeletores() {
         creditosEletivas[tipo] = 0;
         const seletor = criarSeletorEletivas(tipo, tiposDisciplinas[tipo]);
         seletores.append(seletor);
-    });
-
-
-    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
-    popoverTriggerList.map(function(popoverTriggerEl) {
-        return new bootstrap.Popover(popoverTriggerEl);
     });
 }
 

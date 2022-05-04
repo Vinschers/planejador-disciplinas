@@ -200,6 +200,7 @@ body {
 
 .disciplina.feita {
     background-color: var(--green-9) !important;
+    color: var(--gray-0) !important;
     border: 4px solid var(--green-4);
 }
 
